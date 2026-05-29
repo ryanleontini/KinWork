@@ -17,6 +17,13 @@ export default function WelcomePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  async function logOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
+
   async function getUserId() {
     const supabase = createClient();
     const {
@@ -221,6 +228,14 @@ export default function WelcomePage() {
             </button>
           </form>
         )}
+
+        <button
+          onClick={logOut}
+          className="mt-6 w-full text-center text-sm text-muted"
+        >
+          Logged in as someone else?{" "}
+          <span className="font-semibold text-terracotta-dark">Log out</span>
+        </button>
       </div>
     </div>
   );

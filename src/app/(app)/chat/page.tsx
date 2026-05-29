@@ -111,12 +111,25 @@ export default function ChatPage() {
         const { url } = await uploadToMedia(supabase, file, userId);
         mediaUrl = url;
       }
-      await supabase.from("messages").insert({
-        family_id: family.id,
-        sender_id: userId,
-        content: text.trim() || (file ? "📷 Photo" : ""),
-        media_url: mediaUrl,
-      });
+      const { data: inserted } = await supabase
+        .from("messages")
+        .insert({
+          family_id: family.id,
+          sender_id: userId,
+          content: text.trim() || (file ? "📷 Photo" : ""),
+          media_url: mediaUrl,
+        })
+        .select()
+        .single();
+      // Optimistically show our own message immediately. The realtime
+      // subscription (for other members' messages) dedupes by id.
+      if (inserted) {
+        setMessages((prev) =>
+          prev.some((m) => m.id === inserted.id)
+            ? prev
+            : [...prev, inserted as Message],
+        );
+      }
       setText("");
       setFile(null);
     } finally {

@@ -368,13 +368,24 @@ create policy media_owner_delete on storage.objects
 -- ---------------------------------------------------------------------------
 -- Realtime (for the chat page)
 -- ---------------------------------------------------------------------------
+-- Adds public.messages to the supabase_realtime publication so the chat's
+-- postgres_changes subscription receives INSERT events.
+--
+-- Failure-tolerant: if the ALTER PUBLICATION can't run (already a member,
+-- ownership edge case, etc.) we RAISE NOTICE instead of aborting the whole
+-- script — so the rest of schema.sql still applies cleanly. If you see a
+-- notice below saying it couldn't be added, run this line in the SQL editor
+-- yourself:
+--   alter publication supabase_realtime add table public.messages;
 
 do $$
 begin
-  if not exists (
-    select 1 from pg_publication_tables
-    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
-  ) then
-    alter publication supabase_realtime add table public.messages;
-  end if;
+  alter publication supabase_realtime add table public.messages;
+  raise notice 'Added public.messages to supabase_realtime publication.';
+exception
+  when duplicate_object then
+    raise notice 'public.messages is already in supabase_realtime publication.';
+  when others then
+    raise notice 'Could not add public.messages to supabase_realtime: % (%)',
+      sqlerrm, sqlstate;
 end $$;

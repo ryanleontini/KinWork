@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppProvider } from "@/components/AppProvider";
 import { BottomNav } from "@/components/BottomNav";
+import { AccountMenu } from "@/components/AccountMenu";
 import type { Family, FamilyMember } from "@/lib/types";
 
 export default async function AppLayout({
@@ -42,6 +43,10 @@ export default async function AppLayout({
         member: member as FamilyMember,
       }}
     >
+      <AccountMenu
+        name={(member as FamilyMember).display_name}
+        avatarUrl={(member as FamilyMember).avatar_url}
+      />
       <main className="mx-auto min-h-dvh w-full max-w-lg pb-24">{children}</main>
       <BottomNav />
     </AppProvider>

@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm garden palette */
+  --color-cream: #fdfbf7;
+  --color-paper: #fffefb;
+  --color-sage: #5b7f5b;
+  --color-sage-dark: #46663f;
+  --color-sage-light: #e7efe2;
+  --color-terracotta: #c17b4a;
+  --color-terracotta-dark: #a5633a;
+  --color-terracotta-light: #f5e6d8;
+  --color-ink: #3a3a34;
+  --color-muted: #8a8a7e;
+  --color-line: #ece7dc;
+
+  /* Typography */
+  --font-serif: var(--font-lora), Georgia, serif;
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+
+  /* Rounded, soft */
+  --radius: 0.875rem;
+  --radius-lg: 1.25rem;
+
+  --shadow-soft: 0 2px 12px rgba(90, 80, 60, 0.08);
+  --shadow-lift: 0 6px 24px rgba(90, 80, 60, 0.12);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+}
+
+/* Hide scrollbars on horizontal chip rows but keep scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

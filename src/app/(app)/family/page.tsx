@@ -20,7 +20,8 @@ import { Avatar, Spinner } from "@/components/ui";
 import { makeInviteCode } from "@/lib/format";
 import { uploadToMedia, UploadError } from "@/lib/upload";
 import { btnPrimary, btnSecondary, card, inputClass } from "@/lib/styles";
-import type { Family, FamilyMember } from "@/lib/types";
+import { timeUntil } from "@/lib/format";
+import type { Family, FamilyMember, Invite } from "@/lib/types";
 
 export default function FamilyPage() {
   const router = useRouter();
@@ -32,8 +33,7 @@ export default function FamilyPage() {
   const [loading, setLoading] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(family.name);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [invite, setInvite] = useState<Invite | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -85,18 +85,25 @@ export default function FamilyPage() {
     }
   }
 
+  const inviteLink = invite
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/join/${invite.invite_code}`
+    : null;
+
   async function createInvite() {
     setBusy(true);
     const code = makeInviteCode();
-    const { error } = await supabase.from("invites").insert({
-      family_id: family.id,
-      invited_by: userId,
-      invite_code: code,
-    });
+    const { data, error } = await supabase
+      .from("invites")
+      .insert({
+        family_id: family.id,
+        invited_by: userId,
+        invite_code: code,
+      })
+      .select()
+      .single();
     setBusy(false);
-    if (error) return;
-    setInviteCode(code);
-    setInviteLink(`${window.location.origin}/join/${code}`);
+    if (error || !data) return;
+    setInvite(data as Invite);
     setCopied(false);
   }
 
@@ -108,18 +115,34 @@ export default function FamilyPage() {
   }
 
   async function shareLink() {
-    if (!inviteLink) return;
+    if (!inviteLink || !invite) return;
     if (navigator.share) {
       await navigator
         .share({
           title: `Join ${family.name} on KinOS`,
-          text: `You're invited to ${family.name}! Use code ${inviteCode}.`,
+          text: `You're invited to ${family.name}! Use code ${invite.invite_code}.`,
           url: inviteLink,
         })
         .catch(() => {});
     } else {
       copyLink();
     }
+  }
+
+  async function revokeInvite() {
+    if (!invite) return;
+    if (
+      !confirm(
+        "Revoke this invite link? It will stop working immediately.",
+      )
+    )
+      return;
+    // Setting max_uses to used_count makes the cap check fail on any future attempt.
+    await supabase
+      .from("invites")
+      .update({ max_uses: invite.used_count })
+      .eq("id", invite.id);
+    setInvite(null);
   }
 
   async function removeMember(m: FamilyMember) {
@@ -220,14 +243,18 @@ export default function FamilyPage() {
           </button>
         </div>
 
-        {inviteLink && (
+        {invite && inviteLink && (
           <div className={`${card} mb-3 p-4`}>
             <p className="text-sm text-muted">Share this invite:</p>
             <p className="my-1 text-center text-2xl font-semibold tracking-widest text-sage-dark">
-              {inviteCode}
+              {invite.invite_code}
             </p>
-            <p className="mb-3 truncate text-center text-xs text-muted">
+            <p className="mb-2 truncate text-center text-xs text-muted">
               {inviteLink}
+            </p>
+            <p className="mb-3 text-center text-xs text-muted">
+              {invite.used_count} of {invite.max_uses} joins used · expires{" "}
+              {timeUntil(invite.expires_at)}
             </p>
             <div className="flex gap-2">
               <button onClick={copyLink} className={`${btnSecondary} flex-1 py-2`}>
@@ -238,6 +265,12 @@ export default function FamilyPage() {
                 <Share2 className="h-4 w-4" /> Share
               </button>
             </div>
+            <button
+              onClick={revokeInvite}
+              className="mt-2 w-full py-2 text-sm text-terracotta-dark"
+            >
+              Revoke link
+            </button>
           </div>
         )}
 

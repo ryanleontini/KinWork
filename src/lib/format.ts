@@ -15,6 +15,24 @@ export function timeAgo(iso: string): string {
   });
 }
 
+export function timeUntil(iso: string): string {
+  const target = new Date(iso).getTime();
+  const seconds = Math.floor((target - Date.now()) / 1000);
+  if (seconds <= 0) return "expired";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `in ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "in 1 day";
+  if (days < 30) return `in ${days} days`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "numeric",

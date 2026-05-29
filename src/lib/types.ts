@@ -86,6 +86,9 @@ export interface Invite {
   email: string | null;
   invite_code: string;
   accepted: boolean;
+  max_uses: number;
+  used_count: number;
+  expires_at: string;
   created_at: string;
 }
 

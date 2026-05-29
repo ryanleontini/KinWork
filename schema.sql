@@ -90,8 +90,23 @@ create table if not exists public.invites (
   email text,
   invite_code text not null unique,
   accepted boolean not null default false,
+  max_uses integer not null default 10 check (max_uses >= 0 and max_uses <= 1000),
+  used_count integer not null default 0 check (used_count >= 0),
+  expires_at timestamptz not null default (now() + interval '14 days'),
   created_at timestamptz not null default now()
 );
+
+-- For projects that ran an earlier schema, add the new invite columns
+-- without recreating the table.
+alter table public.invites
+  add column if not exists max_uses integer not null default 10
+    check (max_uses >= 0 and max_uses <= 1000);
+alter table public.invites
+  add column if not exists used_count integer not null default 0
+    check (used_count >= 0);
+alter table public.invites
+  add column if not exists expires_at timestamptz not null
+    default (now() + interval '14 days');
 
 -- Helpful indexes
 create index if not exists idx_family_members_family on public.family_members (family_id);
@@ -403,13 +418,25 @@ begin
       using errcode = 'P0001';
   end if;
 
+  -- FOR UPDATE locks the invite row so two simultaneous accepters can't
+  -- both squeak past max_uses.
   select * into v_invite
   from public.invites
-  where invite_code = upper(p_code) and accepted = false
-  limit 1;
+  where invite_code = upper(p_code)
+  for update;
 
   if not found then
-    raise exception 'That invite code doesn''t match an open invite.'
+    raise exception 'That invite code doesn''t match any invite.'
+      using errcode = 'P0001';
+  end if;
+
+  if now() > v_invite.expires_at then
+    raise exception 'That invite has expired. Ask the kinkeeper for a fresh one!'
+      using errcode = 'P0001';
+  end if;
+
+  if v_invite.used_count >= v_invite.max_uses then
+    raise exception 'That invite has already been used the maximum number of times.'
       using errcode = 'P0001';
   end if;
 
@@ -424,7 +451,11 @@ begin
   insert into public.family_members (family_id, user_id, role, display_name)
   values (v_invite.family_id, v_user, 'member', trim(p_display_name));
 
-  update public.invites set accepted = true where id = v_invite.id;
+  update public.invites
+  set used_count = used_count + 1,
+      -- Keep `accepted` informational: true once the link is fully used.
+      accepted = ((used_count + 1) >= max_uses)
+  where id = v_invite.id;
 
   return v_invite.family_id;
 end;

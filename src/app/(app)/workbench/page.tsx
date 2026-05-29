@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/components/AppProvider";
-import { uploadToMedia } from "@/lib/upload";
+import { uploadToMedia, UploadError } from "@/lib/upload";
 import { btnPrimary, btnSecondary, card, inputClass } from "@/lib/styles";
 import type { GardenItem, PostType } from "@/lib/types";
 
@@ -193,8 +193,12 @@ function Editor({
       } else {
         onBack();
       }
-    } catch {
-      setError("Something went sideways — want to try again?");
+    } catch (e) {
+      setError(
+        e instanceof UploadError
+          ? e.message
+          : "Something went sideways — want to try again?",
+      );
       setBusy(false);
     }
   }

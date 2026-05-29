@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/components/AppProvider";
 import { Avatar, Spinner } from "@/components/ui";
 import { clockTime } from "@/lib/format";
-import { uploadToMedia } from "@/lib/upload";
+import { uploadToMedia, UploadError } from "@/lib/upload";
 import { inputClass } from "@/lib/styles";
 import type { Message } from "@/lib/types";
 
@@ -23,6 +23,7 @@ export default function ChatPage() {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -105,6 +106,7 @@ export default function ChatPage() {
     e.preventDefault();
     if (!text.trim() && !file) return;
     setSending(true);
+    setSendError(null);
     let mediaUrl: string | null = null;
     try {
       if (file) {
@@ -132,6 +134,12 @@ export default function ChatPage() {
       }
       setText("");
       setFile(null);
+    } catch (e) {
+      setSendError(
+        e instanceof UploadError
+          ? e.message
+          : "Couldn't send that one — please try again.",
+      );
     } finally {
       setSending(false);
     }
@@ -222,6 +230,12 @@ export default function ChatPage() {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {sendError && (
+        <p className="border-t border-line bg-paper px-4 py-2 text-center text-sm text-terracotta-dark">
+          {sendError}
+        </p>
+      )}
 
       <form
         onSubmit={send}

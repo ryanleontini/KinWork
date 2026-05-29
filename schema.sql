@@ -212,12 +212,16 @@ create policy family_members_select on public.family_members
   for select using (public.is_family_member(family_id));
 
 drop policy if exists family_members_insert on public.family_members;
+-- Direct inserts are restricted to creating one's own founding kinkeeper
+-- membership (when starting a family) or to existing kinkeepers adding
+-- members on behalf. The invite-code join path goes through the
+-- accept_invite() SECURITY DEFINER function defined below, which is the
+-- only way a non-member can be added to a family they don't own.
 create policy family_members_insert on public.family_members
   for insert with check (
     user_id = auth.uid()
     and (
       public.owns_family(family_id)
-      or public.has_open_invite(family_id)
       or public.is_kinkeeper(family_id)
     )
   );
@@ -364,6 +368,70 @@ create policy media_owner_update on storage.objects
 drop policy if exists media_owner_delete on storage.objects;
 create policy media_owner_delete on storage.objects
   for delete using (bucket_id = 'media' and auth.uid() = owner);
+
+-- ---------------------------------------------------------------------------
+-- accept_invite() — the only path for a non-member to join a family
+-- ---------------------------------------------------------------------------
+-- Runs as the function owner (SECURITY DEFINER) and atomically:
+--   1. validates the code against an unaccepted invite,
+--   2. confirms the caller isn't already a member,
+--   3. inserts the family_members row with the given display name,
+--   4. marks the invite accepted (so the code is single-use).
+-- The family_members RLS policy no longer permits "insert because there's an
+-- open invite somewhere" — joining only happens through here.
+
+create or replace function public.accept_invite(
+  p_code text,
+  p_display_name text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_invite public.invites%rowtype;
+begin
+  if v_user is null then
+    raise exception 'You must be signed in to accept an invite.'
+      using errcode = 'P0001';
+  end if;
+
+  if p_display_name is null or length(trim(p_display_name)) = 0 then
+    raise exception 'Please share a name the family can call you.'
+      using errcode = 'P0001';
+  end if;
+
+  select * into v_invite
+  from public.invites
+  where invite_code = upper(p_code) and accepted = false
+  limit 1;
+
+  if not found then
+    raise exception 'That invite code doesn''t match an open invite.'
+      using errcode = 'P0001';
+  end if;
+
+  if exists (
+    select 1 from public.family_members
+    where family_id = v_invite.family_id and user_id = v_user
+  ) then
+    raise exception 'You''re already part of this family!'
+      using errcode = 'P0001';
+  end if;
+
+  insert into public.family_members (family_id, user_id, role, display_name)
+  values (v_invite.family_id, v_user, 'member', trim(p_display_name));
+
+  update public.invites set accepted = true where id = v_invite.id;
+
+  return v_invite.family_id;
+end;
+$$;
+
+revoke all on function public.accept_invite(text, text) from public;
+grant execute on function public.accept_invite(text, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime (for the chat page)

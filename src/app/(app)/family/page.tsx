@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/components/AppProvider";
 import { Avatar, Spinner } from "@/components/ui";
 import { makeInviteCode } from "@/lib/format";
-import { uploadToMedia } from "@/lib/upload";
+import { uploadToMedia, UploadError } from "@/lib/upload";
 import { btnPrimary, btnSecondary, card, inputClass } from "@/lib/styles";
 import type { Family, FamilyMember } from "@/lib/types";
 
@@ -36,6 +36,7 @@ export default function FamilyPage() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
   const isKinkeeper = member.role === "kinkeeper";
@@ -67,11 +68,18 @@ export default function FamilyPage() {
 
   async function changePhoto(file: File) {
     setBusy(true);
+    setPhotoError(null);
     try {
       const { url } = await uploadToMedia(supabase, file, userId);
       await supabase.from("families").update({ photo_url: url }).eq("id", family.id);
       setFamily((f) => ({ ...f, photo_url: url }));
       router.refresh();
+    } catch (e) {
+      setPhotoError(
+        e instanceof UploadError
+          ? e.message
+          : "Couldn't update the photo — please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -198,6 +206,9 @@ export default function FamilyPage() {
         )}
         {family.tagline && (
           <p className="text-center text-sm text-muted">{family.tagline}</p>
+        )}
+        {photoError && (
+          <p className="text-center text-sm text-terracotta-dark">{photoError}</p>
         )}
       </section>
 

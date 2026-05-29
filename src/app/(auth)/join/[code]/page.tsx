@@ -65,27 +65,18 @@ export default function JoinPage() {
       return;
     }
 
-    const { error: memErr } = await supabase.from("family_members").insert({
-      family_id: familyId,
-      user_id: user.id,
-      role: "member",
-      display_name: displayName.trim(),
+    const { error: rpcErr } = await supabase.rpc("accept_invite", {
+      p_code: code,
+      p_display_name: displayName.trim(),
     });
 
-    if (memErr) {
+    if (rpcErr) {
       setError(
-        memErr.message.includes("duplicate")
-          ? "You're already part of this family!"
-          : "We couldn't add you just yet. Want to try again?",
+        rpcErr.message || "We couldn't add you just yet. Want to try again?",
       );
       setJoining(false);
       return;
     }
-
-    await supabase
-      .from("invites")
-      .update({ accepted: true })
-      .eq("invite_code", code);
 
     router.replace("/home");
     router.refresh();

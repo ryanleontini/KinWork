@@ -14,7 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/components/AppProvider";
 import { Avatar, EmptyState, Spinner } from "@/components/ui";
-import { uploadToMedia } from "@/lib/upload";
+import { uploadToMedia, UploadError } from "@/lib/upload";
 import { timeAgo } from "@/lib/format";
 import { btnPrimary, inputClass } from "@/lib/styles";
 import type { FeedPost } from "@/lib/types";
@@ -332,8 +332,12 @@ function Composer({
         });
       }
       onPosted();
-    } catch {
-      setError("Something went sideways — want to try again?");
+    } catch (e) {
+      setError(
+        e instanceof UploadError
+          ? e.message
+          : "Something went sideways — want to try again?",
+      );
       setBusy(false);
     }
   }
